@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Pill } from './Pill';
 
 interface LiveNotesProps {
   transcript: string;
@@ -22,7 +23,9 @@ export default function LiveNotes({ transcript, frameCount = 0 }: LiveNotesProps
   return (
     <div className="flex-1 bg-card border border-border rounded-2xl p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Live Notes</h2>
+        <h2 className="text-lg font-semibold bg-clip-text text-transparent" style={{backgroundImage:'linear-gradient(90deg, #2F7D32, #55A84A, #A6D49F)'}}>
+          Live Notes
+        </h2>
         <div className="text-sm text-muted-foreground">
           {transcript.length} chars • {frameCount} frames
         </div>
@@ -45,8 +48,15 @@ export default function LiveNotes({ transcript, frameCount = 0 }: LiveNotesProps
         )}
       </div>
       
-      <div className="mt-4 text-xs text-muted-foreground">
-        <p>⌘⇧R to start/stop recording • ⌘⇧N for quick note</p>
+      <div className="mt-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Pill color="info">MEDDPICC</Pill>
+          <Pill color="success">Champion</Pill>
+          <Pill color="warn">Risk</Pill>
+        </div>
+        <div className="text-xs text-muted-foreground">
+          ⌘⇧R start/stop • ⌘⇧N quick note
+        </div>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ export function useAudio() {
   const [audioBuffer, setAudioBuffer] = useState<number[]>([]);
   const [levels, setLevels] = useState<number[]>([]); // recent normalized RMS levels
   const [sampleRate, setSampleRate] = useState<number | null>(null);
+  const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null);
   const lastSnippetRef = useRef<string>("");
 
   const handleAudioFrame = useCallback(async (frame: AudioFrame) => {
@@ -84,12 +85,22 @@ export function useAudio() {
     };
   }, [handleAudioFrame]);
 
+  const startRecording = () => {
+    setRecordingStartTime(Date.now());
+  };
+
+  const getRecordingDuration = () => {
+    if (!recordingStartTime) return 0;
+    return Math.floor((Date.now() - recordingStartTime) / 1000);
+  };
+
   const resetAudio = () => {
     setFrameCount(0);
     setTranscript('');
     setAudioBuffer([]);
     setLevels([]);
     setSampleRate(null);
+    setRecordingStartTime(null);
   };
 
   return {
@@ -99,6 +110,8 @@ export function useAudio() {
     transcript,
     setTranscript,
     resetAudio,
+    startRecording,
+    getRecordingDuration,
     levels,
     sampleRate
   };

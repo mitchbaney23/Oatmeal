@@ -5,6 +5,7 @@ import RecorderPanel from './components/RecorderPanel';
 import LiveNotes from './components/LiveNotes';
 import SettingsPanel from './components/SettingsPanel';
 import PostCallScreen from './components/PostCallScreen';
+import SessionsHistory from './components/SessionsHistory';
 import { useAudio } from './hooks/useAudio';
 
 export type AppState = 'idle' | 'recording' | 'processing' | 'post-call';
@@ -12,19 +13,16 @@ export type AppState = 'idle' | 'recording' | 'processing' | 'post-call';
 function App() {
   const [appState, setAppState] = useState<AppState>('idle');
   const [showSettings, setShowSettings] = useState(false);
-  const { isRecording, setIsRecording, transcript, setTranscript, frameCount, resetAudio, levels } = useAudio();
+  const [showHistory, setShowHistory] = useState(false);
+  const { isRecording, setIsRecording, transcript, setTranscript, frameCount, resetAudio, startRecording, getRecordingDuration, levels } = useAudio();
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
         await invoke('initialize_app');
         
-        // Download and initialize whisper model
-        console.log('Downloading whisper-small.en model...');
-        await invoke('download_whisper_model', { 
-          modelName: 'openai/whisper-small.en' 
-        });
-        
+        // Initialize whisper model (using local GGML models)
+        console.log('Initializing local Whisper transcriber...');
         await invoke('initialize_transcriber');
         console.log('Transcriber ready!');
       } catch (error) {
@@ -41,6 +39,7 @@ function App() {
       setIsRecording(true);
       setAppState('recording');
       resetAudio();
+      startRecording();
     } catch (error) {
       console.error('Failed to start recording:', error);
     }
@@ -51,6 +50,24 @@ function App() {
       await invoke('stop_recording');
       setIsRecording(false);
       setAppState('processing');
+      
+      // Save the session to database
+      const duration = getRecordingDuration();
+      const title = `Recording ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+      
+      if (transcript.trim()) {
+        try {
+          const sessionId = await invoke<string>('save_session', {
+            title,
+            duration,
+            transcript: transcript.trim()
+          });
+          console.log('Session saved with ID:', sessionId);
+        } catch (error) {
+          console.error('Failed to save session:', error);
+        }
+      }
+      
       setTimeout(() => setAppState('post-call'), 2000);
     } catch (error) {
       console.error('Failed to stop recording:', error);
@@ -71,6 +88,12 @@ function App() {
     );
   }
 
+  if (showHistory) {
+    return (
+      <SessionsHistory onClose={() => setShowHistory(false)} />
+    );
+  }
+
   if (appState === 'post-call') {
     return (
       <PostCallScreen 
@@ -87,6 +110,7 @@ function App() {
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
         onQuickNote={handleQuickNote}
+        onHistory={() => setShowHistory(true)}
         isRecording={isRecording}
       />
       {appState === 'idle' && (

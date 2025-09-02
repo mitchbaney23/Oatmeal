@@ -11,7 +11,7 @@ mod database;
 mod transcribe;
 
 use audio::runtime::AudioRuntime;
-use database::{Database, Settings};
+use database::{Database, Settings, SessionRecord};
 use transcribe::Transcriber;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -138,6 +138,45 @@ async fn transcribe_audio(audio_frames: Vec<f32>, state: State<'_, AppState>) ->
     transcriber.transcribe_audio_data(&audio_frames).await
 }
 
+#[tauri::command]
+async fn save_session(title: String, duration: i32, transcript: String, app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<String, String> {
+    ensure_database(&app_handle, &state).await?;
+
+    let db_guard = state.database.lock().await;
+    let database = db_guard.as_ref().ok_or("Database not initialized")?;
+
+    database
+        .save_session(&title, duration, &transcript)
+        .await
+        .map_err(|e| format!("Failed to save session: {}", e))
+}
+
+#[tauri::command]
+async fn get_session(session_id: String, app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<Option<SessionRecord>, String> {
+    ensure_database(&app_handle, &state).await?;
+
+    let db_guard = state.database.lock().await;
+    let database = db_guard.as_ref().ok_or("Database not initialized")?;
+
+    database
+        .get_session(&session_id)
+        .await
+        .map_err(|e| format!("Failed to get session: {}", e))
+}
+
+#[tauri::command]
+async fn list_sessions(limit: Option<i32>, app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<Vec<SessionRecord>, String> {
+    ensure_database(&app_handle, &state).await?;
+
+    let db_guard = state.database.lock().await;
+    let database = db_guard.as_ref().ok_or("Database not initialized")?;
+
+    database
+        .list_sessions(limit)
+        .await
+        .map_err(|e| format!("Failed to list sessions: {}", e))
+}
+
 fn main() {
     // Load .env if present for API keys, etc.
     let _ = dotenvy::dotenv();
@@ -165,7 +204,10 @@ fn main() {
             update_settings,
             initialize_transcriber,
             download_whisper_model,
-            transcribe_audio
+            transcribe_audio,
+            save_session,
+            get_session,
+            list_sessions
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

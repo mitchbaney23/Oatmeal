@@ -135,4 +135,92 @@ impl Database {
 
         Ok(id)
     }
+
+    pub async fn save_session(&self, title: &str, duration: i32, transcript: &str) -> Result<String, sqlx::Error> {
+        let id = uuid::Uuid::new_v4().to_string();
+        
+        sqlx::query(r#"
+            INSERT INTO sessions (id, title, duration, transcript) VALUES (?, ?, ?, ?)
+        "#)
+        .bind(&id)
+        .bind(title)
+        .bind(duration)
+        .bind(transcript)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(id)
+    }
+
+    pub async fn update_session_transcript(&self, session_id: &str, transcript: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(r#"
+            UPDATE sessions SET transcript = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        "#)
+        .bind(transcript)
+        .bind(session_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_session(&self, session_id: &str) -> Result<Option<SessionRecord>, sqlx::Error> {
+        let row = sqlx::query("SELECT * FROM sessions WHERE id = ?")
+            .bind(session_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        match row {
+            Some(row) => Ok(Some(SessionRecord {
+                id: row.get("id"),
+                title: row.get("title"),
+                date: row.get("date"),
+                duration: row.get("duration"),
+                transcript: row.get("transcript"),
+                summary: row.get("summary"),
+                artifacts: row.get("artifacts"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+            })),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn list_sessions(&self, limit: Option<i32>) -> Result<Vec<SessionRecord>, sqlx::Error> {
+        let limit_value = limit.unwrap_or(50);
+        let rows = sqlx::query("SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?")
+            .bind(limit_value)
+            .fetch_all(&self.pool)
+            .await?;
+
+        let sessions = rows
+            .into_iter()
+            .map(|row| SessionRecord {
+                id: row.get("id"),
+                title: row.get("title"),
+                date: row.get("date"),
+                duration: row.get("duration"),
+                transcript: row.get("transcript"),
+                summary: row.get("summary"),
+                artifacts: row.get("artifacts"),
+                created_at: row.get("created_at"),
+                updated_at: row.get("updated_at"),
+            })
+            .collect();
+
+        Ok(sessions)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SessionRecord {
+    pub id: String,
+    pub title: String,
+    pub date: String,
+    pub duration: i32,
+    pub transcript: Option<String>,
+    pub summary: Option<String>,
+    pub artifacts: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
 }

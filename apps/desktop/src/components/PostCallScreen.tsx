@@ -34,7 +34,9 @@ export default function PostCallScreen({ onClose }: PostCallScreenProps) {
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">Call Summary</h1>
+          <h1 className="text-2xl font-bold bg-clip-text text-transparent" style={{backgroundImage:'linear-gradient(90deg, #2F7D32, #55A84A, #A6D49F)'}}>
+            Call Summary
+          </h1>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>

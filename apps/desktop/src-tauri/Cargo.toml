@@ -25,6 +25,7 @@ cpal = "0.15"
 crossbeam-channel = "0.5"
 hound = "3.5"
 dotenvy = "0.15"
+whisper-rs = { version = "0.12", features = ["metal"] }
 
 [features]
 default = [ "custom-protocol" ]
