@@ -1,0 +1,28 @@
+name: Follow-up Email
+type: email
+subject: Recap + next step for {{company.name}}
+body: |
+  Hi {{#if stakeholders.0.name}}{{stakeholders.0.name}}{{else}}team{{/if}},
+
+  Thanks for the call today. Here are the key highlights:
+
+  {{#each summary_bullets}}
+  - {{this}}
+  {{/each}}
+
+  {{#if next_steps.0}}
+  **Next step:** {{next_steps.0.text}}
+  {{else}}
+  **Next step:** {{crm_update.next_step}}
+  {{/if}}
+
+  {{#if risks}}
+  **Items to address:**
+  {{#each risks}}
+  - {{this}}
+  {{/each}}
+  {{/if}}
+
+  Looking forward to moving forward together.
+
+  Best regards

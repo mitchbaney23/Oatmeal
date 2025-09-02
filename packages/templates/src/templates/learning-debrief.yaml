@@ -1,0 +1,30 @@
+name: Personal Learning Debrief
+type: markdown
+body: |
+  # What I learned ({{meeting_meta.title}})
+  
+  ## Top Moments
+  {{#each learning.moments}}
+  - [{{timestamp}}] *{{tag}}*: "{{quote}}" — {{why_it_matters}}
+  {{/each}}
+  
+  ## Questions for Next Time
+  {{#each learning.questions_for_next_time}}
+  - {{this}}
+  {{/each}}
+  
+  ## Skill Snapshot
+  - **Discovery:** {{learning.skill_scores.discovery}}/5
+  - **Objection Handling:** {{learning.skill_scores.objection_handling}}/5  
+  - **Closing:** {{learning.skill_scores.closing}}/5
+  - **Listening:** {{learning.skill_scores.listening}}/5
+  - **Executive Presence:** {{learning.skill_scores.exec_presence}}/5
+  
+  ## Coach Notes
+  {{learning.coaching_notes}}
+  
+  ## Micro Lessons
+  {{#each learning.micro_lessons}}
+  ### {{title}}
+  {{tip}} *({{titleCase confidence}} confidence)*
+  {{/each}}

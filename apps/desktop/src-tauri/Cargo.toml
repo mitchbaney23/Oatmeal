@@ -1,0 +1,31 @@
+[package]
+name = "oatmeal-desktop"
+version = "1.0.0"
+description = "Oatmeal desktop application"
+authors = ["Oatmeal Team"]
+license = "MIT"
+repository = ""
+default-run = "oatmeal-desktop"
+edition = "2021"
+rust-version = "1.60"
+
+[build-dependencies]
+tauri-build = { version = "1.0", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "1.0", features = [ "api-all", "macos-private-api", "system-tray", "global-shortcut"] }
+tokio = { version = "1.0", features = ["full"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+uuid = { version = "1.0", features = ["v4"] }
+reqwest = { version = "0.11", features = ["json", "multipart"] }
+base64 = "0.21"
+cpal = "0.15"
+crossbeam-channel = "0.5"
+hound = "3.5"
+dotenvy = "0.15"
+
+[features]
+default = [ "custom-protocol" ]
+custom-protocol = [ "tauri/custom-protocol" ]

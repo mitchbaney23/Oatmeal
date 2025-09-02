@@ -1,0 +1,25 @@
+{
+  "name": "@oatmeal/templates",
+  "version": "1.0.0",
+  "description": "YAML template renderer with Handlebars for Oatmeal",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest",
+    "lint": "eslint src --ext ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.8",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/handlebars": "^4.1.0",
+    "tsup": "^7.2.0",
+    "typescript": "^5.1.0",
+    "vitest": "^0.34.0"
+  }
+}

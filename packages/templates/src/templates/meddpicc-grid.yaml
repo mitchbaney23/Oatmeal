@@ -1,0 +1,33 @@
+name: MEDDPICC Grid
+type: markdown
+body: |
+  # MEDDPICC — {{company.name}}
+  
+  - **Metrics:** {{#each meddpicc.metrics}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+  - **Economic Buyer:** {{meddpicc.economic_buyer}}
+  - **Decision Criteria:**
+  {{#each meddpicc.decision_criteria}}
+    - {{this}}
+  {{/each}}
+  - **Decision Process:**
+  {{#each meddpicc.decision_process}}
+    - {{this}}
+  {{/each}}
+  - **Paper Process:**
+  {{#each meddpicc.paper_process}}
+    - {{this}}
+  {{/each}}
+  - **Implication of Pain:**
+  {{#each meddpicc.implication_of_pain}}
+    - {{this}}
+  {{/each}}
+  - **Champion:** {{meddpicc.champion}}
+  - **Competition:**
+  {{#each meddpicc.competition}}
+    - {{this}}
+  {{/each}}
+  
+  ## Gaps to Fill
+  {{#each meddpicc.gaps}}
+  - {{this}}
+  {{/each}}

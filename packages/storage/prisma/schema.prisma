@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Settings {
+  id                String   @id @default(uuid())
+  enableTelemetry   Boolean  @default(true)
+  retentionDays     Int      @default(30)
+  useGpu            Boolean  @default(false)
+  model             String   @default("claude-3-5-sonnet")
+  enableHubspot     Boolean  @default(false)
+  enableGmail       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model UserProfile {
+  id           String   @id @default(uuid())
+  name         String
+  role         String   @default("Account Executive")
+  seniority    String   @default("mid") // early-career|mid|senior
+  sectorFocus  String?
+  goals        String   // JSON array
+  frameworks   String   @default("[\"MEDDPICC\"]") // JSON array
+  coachingStyle String  @default("supportive") // direct|supportive|analytical
+  prioritySkills String @default("[\"discovery\",\"objection_handling\",\"closing\"]") // JSON array
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  title        String
+  date         DateTime @default(now())
+  duration     Int      // minutes
+  transcript   String?
+  summary      String?  // JSON
+  artifacts    String?  // JSON - paths to generated files
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model SrsCard {
+  id         String   @id @default(uuid())
+  prompt     String
+  answer     String?
+  ease       Float    @default(2.5)
+  interval   Int      @default(1)
+  dueAt      DateTime @default(now())
+  sessionId  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  session    Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model SrsReview {
+  id       String   @id @default(uuid())
+  cardId   String
+  quality  Int      // 0-5 SM-2 quality
+  ease     Float
+  interval Int
+  reviewedAt DateTime @default(now())
+  
+  card     SrsCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}

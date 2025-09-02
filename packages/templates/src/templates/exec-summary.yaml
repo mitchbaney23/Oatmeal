@@ -1,0 +1,50 @@
+name: Executive Summary
+type: markdown
+body: |
+  # {{meeting_meta.title}}
+  
+  **Attendees:** {{join meeting_meta.attendees ", "}}
+  **Duration:** {{meeting_meta.duration_minutes}} minutes
+  
+  ## Key Points
+  {{#each summary_bullets}}
+  - {{this}}
+  {{/each}}
+  
+  ## Pain Points
+  {{#each pain_points}}
+  - {{this}}
+  {{/each}}
+  
+  ## Decision Criteria
+  {{#each decision_criteria}}
+  - {{this}}
+  {{/each}}
+  
+  ## Timeline
+  {{#if timeline.event}}
+  **{{timeline.event}}:** {{timeline.date}}
+  {{/if}}
+  
+  ## Budget
+  {{#if budget.mentioned}}
+  **Budget Notes:** {{budget.notes}}
+  {{/if}}
+  
+  ## Stakeholders
+  {{#each stakeholders}}
+  - **{{name}}** ({{role}}) - {{titleCase influence}} influence
+  {{/each}}
+  
+  ## Risks
+  {{#each risks}}
+  - {{this}}
+  {{/each}}
+  
+  ## Next Steps
+  {{#each todos}}
+  - {{text}} ({{owner}}, {{due}})
+  {{/each}}
+  
+  **CRM Update:** {{crm_update.next_step}}
+  **Confidence:** {{titleCase crm_update.confidence}}
