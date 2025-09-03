@@ -70,3 +70,28 @@ model SrsReview {
   
   card     SrsCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
 }
+
+model SummaryVariant {
+  id          String   @id @default(uuid())
+  sessionId   String
+  approach    String   // 'detailed' | 'concise' | 'action-focused'
+  summary     String   // JSON summary content
+  temperature Float
+  latencyMs   Int
+  createdAt   DateTime @default(now())
+  
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  preferences SummaryPreference[]
+}
+
+model SummaryPreference {
+  id        String   @id @default(uuid())
+  variantId String
+  userId    String   @default("default") // For future multi-user support
+  rating    Int      // 1-5 rating
+  feedback  String?  // Optional text feedback
+  chosen    Boolean  @default(false) // Was this variant chosen as best?
+  createdAt DateTime @default(now())
+  
+  variant   SummaryVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@oatmeal/ui';
-import { X, Shield, Clock, Cpu, Zap } from 'lucide-react';
+import { X, Shield, Clock, Cpu, Zap, Bot } from 'lucide-react';
 import { useSettings, type Settings as BackendSettings } from '../hooks/useSettings';
 
 interface SettingsPanelProps {
@@ -115,6 +115,26 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
               
               <div className="flex items-center justify-between">
                 <div>
+                  <p className="font-medium">Transcription chunk length</p>
+                  <p className="text-sm text-muted-foreground">How many seconds of audio to batch per step</p>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={6}
+                  step={0.5}
+                  value={draft?.chunk_seconds ?? 2.5}
+                  onChange={(e) => {
+                    const val = Math.max(1, Math.min(6, Number(e.target.value)));
+                    if (draft) setDraft(prev => ({ ...(prev as BackendSettings), chunk_seconds: val }));
+                  }}
+                  className="w-24 px-3 py-1 border border-border rounded-md bg-background text-right"
+                  disabled={!draft}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
                   <p className="font-medium">LLM Model</p>
                   <p className="text-sm text-muted-foreground">Choose AI model for analysis</p>
                 </div>
@@ -129,6 +149,64 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
                   <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
                 </select>
               </div>
+            </div>
+          </section>
+
+          <section className="bg-card border border-border rounded-2xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Bot className="w-5 h-5" />
+              <h2 className="text-lg font-semibold">Summaries</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Summary engine</p>
+                  <p className="text-sm text-muted-foreground">Choose where to generate AI summaries</p>
+                </div>
+                <select
+                  value={draft?.summary_engine ?? 'ollama'}
+                  onChange={(e) => draft && setDraft(prev => ({ ...(prev as BackendSettings), summary_engine: e.target.value as any }))}
+                  className="px-3 py-1 border border-border rounded-md bg-background"
+                  disabled={!draft}
+                >
+                  <option value="ollama">Local (Ollama)</option>
+                  <option value="anthropic">Claude (cloud)</option>
+                  <option value="openai">OpenAI (cloud)</option>
+                  <option value="none">Disabled</option>
+                </select>
+              </div>
+
+              {draft?.summary_engine === 'ollama' && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Ollama model</p>
+                      <p className="text-sm text-muted-foreground">e.g., llama3.1:8b-instruct-q4_K_M</p>
+                    </div>
+                    <input
+                      type="text"
+                      value={draft?.ollama_model ?? ''}
+                      onChange={(e) => draft && setDraft(prev => ({ ...(prev as BackendSettings), ollama_model: e.target.value }))}
+                      className="w-72 px-3 py-1 border border-border rounded-md bg-background"
+                      disabled={!draft}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Ollama host</p>
+                      <p className="text-sm text-muted-foreground">Local server URL</p>
+                    </div>
+                    <input
+                      type="text"
+                      value={draft?.ollama_host ?? 'http://127.0.0.1:11434'}
+                      onChange={(e) => draft && setDraft(prev => ({ ...(prev as BackendSettings), ollama_host: e.target.value }))}
+                      className="w-72 px-3 py-1 border border-border rounded-md bg-background"
+                      disabled={!draft}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </section>
 

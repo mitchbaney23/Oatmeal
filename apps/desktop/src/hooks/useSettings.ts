@@ -8,6 +8,10 @@ export interface Settings {
   model: string;
   enable_hubspot: boolean;
   enable_gmail: boolean;
+  chunk_seconds: number; // live transcription chunk length in seconds
+  summary_engine: 'ollama' | 'anthropic' | 'openai' | 'none';
+  ollama_model: string;
+  ollama_host: string;
 }
 
 export function useSettings() {

@@ -7,6 +7,59 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use crossbeam_channel as channel;
 use tauri::Manager;
 
+fn detect_headphones_or_external_audio(host: &cpal::Host) -> bool {
+  // Check the default output device to determine if headphones or external audio is connected
+  if let Some(default_output) = host.default_output_device() {
+    if let Ok(device_name) = default_output.name() {
+      let name_lower = device_name.to_lowercase();
+      
+      // Common indicators of headphones or external audio devices
+      let headphone_indicators = [
+        "headphone", "headset", "airpods", "bluetooth", "usb", "external",
+        "beats", "sony", "bose", "sennheiser", "audio-technica", "beyerdynamic"
+      ];
+      
+      for indicator in &headphone_indicators {
+        if name_lower.contains(indicator) {
+          return true;
+        }
+      }
+      
+      // Check if it's NOT the built-in speakers
+      if !name_lower.contains("built-in") && 
+         !name_lower.contains("internal") && 
+         !name_lower.contains("macbook") {
+        return true; // Likely external audio device
+      }
+    }
+  }
+  
+  // Also check output devices list for connected external devices
+  if let Ok(devices) = host.output_devices() {
+    let mut external_device_count = 0;
+    for device in devices {
+      if let Ok(name) = device.name() {
+        let name_lower = name.to_lowercase();
+        if !name_lower.contains("built-in") && !name_lower.contains("internal") {
+          external_device_count += 1;
+        }
+      }
+    }
+    // If there are external devices available, assume they might be in use
+    if external_device_count > 0 {
+      return true;
+    }
+  }
+  
+  false // Default to built-in speakers/microphone setup
+}
+
+#[derive(Debug, Clone)]
+pub enum AudioSource {
+  Microphone,
+  SystemAudio,
+}
+
 enum Command {
   Start(tauri::AppHandle),
   Stop,
@@ -36,14 +89,58 @@ impl AudioRuntime {
         }
         is_capturing_flag.store(true, Ordering::Relaxed);
 
-        // Device selection
+        // Automatic device selection based on Mac's current audio setup
         let host = cpal::default_host();
-        let device = match host.default_input_device() {
-          Some(d) => d,
-          None => {
-            eprintln!("No default input device available");
-            is_capturing_flag.store(false, Ordering::Relaxed);
-            return;
+        
+        // First, check if there are headphones or external audio devices connected
+        let should_use_system_audio = detect_headphones_or_external_audio(&host);
+        
+        let (device, actual_source) = if should_use_system_audio {
+          // Look for system audio loopback device
+          let mut loopback_device = None;
+          if let Ok(devices) = host.input_devices() {
+            for device in devices {
+              if let Ok(name) = device.name() {
+                // Look for common macOS loopback device names
+                if name.to_lowercase().contains("soundflower") || 
+                   name.to_lowercase().contains("loopback") ||
+                   name.to_lowercase().contains("blackhole") ||
+                   name.to_lowercase().contains("multi-output") {
+                  loopback_device = Some(device);
+                  break;
+                }
+              }
+            }
+          }
+          
+          match loopback_device {
+            Some(d) => {
+              println!("Detected headphones/external audio - using system audio capture");
+              (d, AudioSource::SystemAudio)
+            }
+            None => {
+              println!("Headphones detected but no loopback device found - falling back to microphone");
+              println!("For better experience with headphones, install: brew install --cask blackhole-16ch");
+              match host.default_input_device() {
+                Some(d) => (d, AudioSource::Microphone),
+                None => {
+                  eprintln!("No input device available");
+                  is_capturing_flag.store(false, Ordering::Relaxed);
+                  return;
+                }
+              }
+            }
+          }
+        } else {
+          // Use microphone when audio is going to speakers
+          println!("Audio going to speakers - using microphone");
+          match host.default_input_device() {
+            Some(d) => (d, AudioSource::Microphone),
+            None => {
+              eprintln!("No default input device available");
+              is_capturing_flag.store(false, Ordering::Relaxed);
+              return;
+            }
           }
         };
 

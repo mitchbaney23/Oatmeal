@@ -25,6 +25,19 @@
     --input: 120 10% 90%;
     --ring: 122 45% 45%;               /* focus ring ~sprout */
     --radius: 10px;                    /* md radius */
+    
+    /* Additional Oatmeal theme variables */
+    --bg: #FFFDF9;                     /* neutral.oatCream */
+    --surface: #FFFFFF;
+    --text: #1A1F1A;                   /* neutral.field */
+    --primary-brand: #2F7D32;          /* brand.sprout */
+    --primary-2: #55A84A;              /* brand.fresh */
+    --accent-brand: #E6B63E;           /* brand.oat */
+    --info: #3B82F6;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --success: #10B981;
+    --ring-brand: rgba(85,168,74,.6);
   }
 
   .dark {
@@ -48,6 +61,11 @@
     --border: 140 6% 18%;
     --input: 140 6% 18%;
     --ring: 122 45% 46%;
+    
+    /* Dark mode overrides */
+    --bg: #0E1110;
+    --surface: #121614;
+    --text: #EDEDED;
   }
 }
 

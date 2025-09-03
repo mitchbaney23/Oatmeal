@@ -1,5 +1,5 @@
 import { Settings, Mic, MicOff, FileText, Circle, History } from 'lucide-react';
-import LogoUrl from '../assets/oatmeal-logo.png';
+// import LogoUrl from '../assets/oatmeal-logo.png';
 import { Button } from '@oatmeal/ui';
 
 interface MenuBarProps {
@@ -22,7 +22,12 @@ export default function MenuBar({
   return (
     <div className="flex items-center justify-between px-4 py-2 bg-card/95 backdrop-blur border-b border-border">
       <div className="flex items-center gap-2">
-        <img src={LogoUrl} alt="Oatmeal" className="w-7 h-7 rounded-sm shadow-card" />
+        <div 
+          className="h-7 w-7 rounded-sm shadow-card"
+          style={{
+            background: 'linear-gradient(135deg, #2F7D32, #55A84A)'
+          }}
+        />
         <h1 className="text-lg font-semibold">Oatmeal</h1>
         {isRecording && (
           <span className="ml-3 inline-flex items-center gap-1 text-xs text-destructive">
@@ -55,7 +60,7 @@ export default function MenuBar({
           </Button>
         ) : (
           <Button
-            variant="default"
+            variant="primary"
             size="sm"
             onClick={onStartRecording}
             className="flex items-center gap-2"

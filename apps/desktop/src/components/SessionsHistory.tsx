@@ -11,6 +11,7 @@ interface SessionRecord {
   transcript?: string;
   summary?: string;
   artifacts?: string;
+  folder_id?: string;
   created_at: string;
   updated_at: string;
 }

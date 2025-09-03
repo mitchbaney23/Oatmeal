@@ -19,7 +19,7 @@ It is **privacy-first** (local transcription by default, opt-in recording) and l
 
 ## Current Implementation Status
 
-### ✅ COMPLETED - Project Scaffold (Bootstrap)
+### ✅ COMPLETED - Full Audio & AI Pipeline
 **Structure Created:**
 ```
 / (repo root)
@@ -31,7 +31,7 @@ It is **privacy-first** (local transcription by default, opt-in recording) and l
 │   ├── audio-core/ (interfaces only)
 │   ├── transcribe/ (EventEmitter stub)
 │   ├── diarize/ (basic clustering interface)
-│   ├── llm/ (Claude/OpenAI + strict JSON schema ✅)
+│   ├── llm/ (Claude/OpenAI + Ollama + strict JSON schema ✅)
 │   ├── templates/ (Handlebars renderer ✅)
 │   ├── storage/ (Prisma schema + services ✅)
 │   ├── integrations/ (HubSpot/Gmail stubs)
@@ -40,116 +40,159 @@ It is **privacy-first** (local transcription by default, opt-in recording) and l
 │   └── telemetry/ (local file sink ✅)
 ```
 
-**Working Features:**
-- ✅ **Build system**: `npm run build`, `npm run test`, `npm run lint`, `npm run typecheck` all pass
-- ✅ **UI Components**: MenuBar, RecorderPanel, LiveNotes, SettingsPanel, PostCallScreen
-- ✅ **Global hotkeys**: ⌘⇧R (record), ⌘⇧N (quick note) - registered in Tauri backend
-- ✅ **Settings UI**: Privacy toggles, retention days, model selection, integration status
-- ✅ **Database schema**: Settings, UserProfile, Session, SrsCard, SrsReview tables
-- ✅ **LLM integration**: Strict JSON schema validation for meeting summaries
-- ✅ **Template system**: YAML + Handlebars with helpers (join, titleCase)
+**✅ FULLY WORKING FEATURES:**
+- ✅ **Complete Desktop App**: Tauri app builds and runs successfully
+- ✅ **Audio Pipeline**: Real-time audio capture with automatic device detection (mic/system audio)
+- ✅ **Local AI Transcription**: Whisper.cpp with Metal GPU acceleration (base.en model loaded)
+- ✅ **Multi-LLM Support**: Ollama integration with Llama 3 8B + preference learning system
+- ✅ **macOS Permissions**: Complete permission handling with UI prompts and status indicators
+- ✅ **Global Shortcuts**: ⌘⇧R (record), ⌘⇧N (quick note) working
+- ✅ **Real-time UI**: Live transcription display with audio level visualization
+- ✅ **Dark Mode Theme**: Complete Oatmeal brand styling with gradient header logo
+- ✅ **Database**: SQLite with session storage, settings persistence
+- ✅ **Build System**: All commands working (`npm run build`, `test`, `lint`, `typecheck`, `tauri:dev`)
 
-**Current Status**: Frontend builds and runs, Tauri backend has command stubs, but **no actual audio processing yet**.
+**✅ AI FEATURES IMPLEMENTED:**
+- ✅ **Interactive AI Training**: Generate 3 summary variants (detailed, concise, action-focused)
+- ✅ **Preference Learning**: User feedback system to improve AI outputs over time
+- ✅ **Adaptive Summaries**: AI learns from user choices to generate better summaries
+- ✅ **Multiple AI Approaches**: Different temperature/personality settings for variety
+
+**✅ TECHNICAL ACHIEVEMENTS:**
+- ✅ **Automatic Audio Routing**: Detects headphones/external audio and switches to system capture
+- ✅ **Permission Management**: Graceful macOS microphone permission requests with clear UI
+- ✅ **Real-time Processing**: Voice activity detection with chunked transcription
+- ✅ **Error Handling**: Robust error handling with user-friendly messages
 
 ---
 
-## NEXT IMPLEMENTATION PHASES
+## CURRENT STATUS: 🎯 **MVP COMPLETE - Ready for Enhanced Features**
 
-### Phase 1: Audio Foundation 🎯 **CURRENT PRIORITY**
-**Required**: Rust/Cargo installation
+### 🚀 **WORKING END-TO-END FLOW**
+1. **Record Meeting**: Click "New Note" or use ⌘⇧R
+2. **Real-time Transcription**: Speech automatically transcribed using local Whisper
+3. **AI Summary Generation**: Generate 3 different summary styles using Llama 3 8B
+4. **Learn from Feedback**: Rate summaries to improve future AI outputs
+5. **Session Management**: View history, search past meetings
 
-1. **Install Rust toolchain** (rustup, cargo)
-2. **Audio Capture Implementation**:
-   - Rust: CoreAudio binding (cpal or coreaudio-rs)
-   - 16kHz mono PCM, 20ms frames (320 samples)
-   - WebRTC VAD with threshold 0-3
-   - Tauri commands: `audio_start`, `audio_stop`, `audio:frame` events
-3. **TypeScript Audio Client**:
-   - Ring buffer (2s backpressure)
-   - Frame subscription with backpressure handling
-   - Integration with React UI state
+### 🎉 **NEXT ENHANCEMENT PHASES**
 
-### Phase 2: Transcription Pipeline
-1. **Whisper.cpp Integration**:
-   - Rust binding to whisper.cpp
-   - Model management (tiny/base/small/medium)
-   - Streaming transcription with partials
-   - Realtime factor (RTF) monitoring for cloud fallback
-2. **Cloud Fallback**: Deepgram or AssemblyAI WebSocket
-3. **Speaker Diarization**: Basic clustering with embeddings
+### Phase 1: Advanced AI Features (Current Focus)
+- **MEDDPICC Extraction**: Automatically identify sales methodology components
+- **Action Items Detection**: Extract and format next steps
+- **Meeting Insights**: Detect questions asked, opportunities missed
+- **Sales Coaching**: Generate personalized feedback and suggestions
 
-### Phase 3: LLM Pipeline & Templates  
-1. **Complete Claude/OpenAI clients** with retry logic
-2. **Template engine** with sample YAML templates
-3. **Summary pipeline**: transcript → JSON → markdown/email
-4. **Learning extraction**: skill scoring, moment detection
+### Phase 2: Template System Enhancement
+- **Custom Templates**: YAML-based summary templates for different meeting types
+- **Email Draft Generation**: Auto-generate follow-up emails from summaries
+- **CRM Integration**: Format summaries for HubSpot/Salesforce import
+- **Export Options**: PDF, Markdown, JSON export formats
 
-### Phase 4: Integrations & Storage
-1. **Database initialization** and settings persistence 
-2. **HubSpot API**: Private app token, engagement notes
-3. **Gmail API**: OAuth flow, draft creation
-4. **File exports**: ZIP generation, session artifacts
+### Phase 3: Advanced Audio Features
+- **Speaker Diarization**: Identify who said what in meetings
+- **Audio Quality Enhancement**: Noise reduction and normalization
+- **Multiple Language Support**: Extend beyond English transcription
+- **Cloud Backup**: Optional cloud transcription for accuracy boost
 
-### Phase 5: Polish & Testing
-1. **End-to-end testing**: record → transcribe → summarize → export
-2. **Error handling**: graceful failures, user feedback
-3. **Performance optimization**: memory usage, model switching
+### Phase 4: Integration Ecosystem
+- **HubSpot Integration**: Direct sync with CRM contacts and deals
+- **Gmail Integration**: Auto-draft follow-up emails
+- **Calendar Integration**: Automatic meeting detection and scheduling
+- **Slack/Teams**: Share summaries with team channels
+
+### Phase 5: Learning & Analytics
+- **Performance Tracking**: Sales performance metrics over time  
+- **Coaching Dashboard**: Identify patterns and improvement areas
+- **Spaced Repetition**: Flashcards for sales techniques and objection handling
+- **Team Analytics**: Aggregate insights for sales teams
 
 ---
 
 ## Development Commands
 
 ```bash
-# Current working commands
-npm install              # ✅ Works
-npm run build           # ✅ Works (frontend only)
-npm run test            # ✅ Works (LLM package tests pass)  
-npm run lint            # ✅ Works
-npm run typecheck       # ✅ Works
+# ✅ ALL WORKING COMMANDS
+npm install              # Install all dependencies
+npm run build           # Build all packages + frontend
+npm run test            # Run test suites (LLM package tests pass)
+npm run lint            # Lint all TypeScript code
+npm run typecheck       # Type check all packages
+npm run tauri:dev       # 🚀 Start full desktop app (Tauri + React)
+npm run tauri:build     # Build production desktop binary
+npm run dl:models       # Download Whisper models (already done)
+```
 
-# Planned commands (need Rust)
-npm run tauri:dev       # Start Tauri dev server
-npm run tauri:build     # Build desktop app binary
-npm run dl:models       # Download whisper models
-npm run sample:record   # Record test audio
+### 🎯 **Quick Start Guide**
+```bash
+# 1. Start the desktop app
+npm run tauri:dev
+
+# 2. The app will launch with:
+# - ✅ Whisper model loaded (Metal GPU acceleration)
+# - ✅ Global shortcuts registered (⌘⇧R, ⌘⇧N)
+# - ✅ Audio pipeline ready
+# - ✅ Permission handling working
+
+# 3. Test the full flow:
+# - Click "New Note" or press ⌘⇧R
+# - Grant microphone permissions when prompted
+# - Speak into microphone (real-time transcription)
+# - Stop recording to see AI summary generation
 ```
 
 ---
 
-## Critical Dependencies Needed
-1. **Rust toolchain**: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-2. **Tauri CLI**: Will be available after Rust install
-3. **Whisper models**: Download via `npm run dl:models` script (already created)
-4. **API keys**: Add to `.env` file (template created)
+## ✅ Dependencies Status - ALL INSTALLED
+1. **✅ Rust toolchain**: Installed and working
+2. **✅ Tauri CLI**: Working (builds and runs successfully)
+3. **✅ Whisper models**: Base.en model downloaded and loaded with Metal GPU
+4. **✅ Ollama + Llama 3 8B**: Local AI model running for summaries
+5. **✅ Audio system**: CPAL + system audio capture working
 
 ---
 
-## File Locations for Context
+## 🗂️ Key Files & Architecture
 
-**Key Implementation Files:**
-- `apps/desktop/src-tauri/src/main.rs` - Tauri backend with command stubs
-- `apps/desktop/src/App.tsx` - Main React app with state management
-- `packages/llm/src/prompts/summary.ts` - JSON schema + validation ✅
-- `packages/llm/src/chain.ts` - LLM pipeline implementation ✅
-- `packages/storage/prisma/schema.prisma` - Database schema ✅
-- `packages/templates/src/index.ts` - YAML/Handlebars renderer ✅
+### **Core Application Files:**
+- `apps/desktop/src-tauri/src/main.rs` - ✅ **Tauri backend with full audio + AI commands**
+- `apps/desktop/src-tauri/src/permissions.rs` - ✅ **macOS permission handling**
+- `apps/desktop/src-tauri/src/audio/runtime.rs` - ✅ **Real-time audio capture + device detection**
+- `apps/desktop/src-tauri/src/transcribe.rs` - ✅ **Whisper.cpp transcription**
+- `apps/desktop/src-tauri/src/database.rs` - ✅ **SQLite session management**
+- `apps/desktop/src/App.tsx` - ✅ **Main React app with full state management**
+- `apps/desktop/src/hooks/useAudio.ts` - ✅ **Audio hook with VAD + real-time processing**
 
-**Configuration:**
-- `package.json` - Root npm workspaces config
-- `tsconfig.base.json` - Shared TypeScript config
-- `apps/desktop/src-tauri/tauri.conf.json` - Tauri app configuration
-- `.env.example` - Environment variables template
+### **AI & Processing:**
+- `packages/llm/src/providers/ollama.ts` - ✅ **Ollama integration + preference learning**
+- `packages/llm/src/prompts/summary.ts` - ✅ **JSON schema + validation**
+- `packages/llm/src/chain.ts` - ✅ **LLM pipeline implementation**
+- `packages/storage/prisma/schema.prisma` - ✅ **Database schema with preferences**
+
+### **UI Components:**
+- `apps/desktop/src/components/PostCallScreen.tsx` - ✅ **AI summary generation + rating UI**
+- `apps/desktop/src/components/RecorderPanel.tsx` - ✅ **Recording interface + audio levels**
+- `apps/desktop/src/components/LiveNotes.tsx` - ✅ **Real-time transcription display**
+- `apps/desktop/src/components/SettingsPanel.tsx` - ✅ **App configuration**
+- `apps/desktop/src/components/SessionsHistory.tsx` - ✅ **Session management**
+
+### **Configuration:**
+- `apps/desktop/src-tauri/tauri.conf.json` - ✅ **Tauri config + macOS permissions**
+- `apps/desktop/src-tauri/entitlements.plist` - ✅ **macOS entitlements**
+- `apps/desktop/src-tauri/Cargo.toml` - ✅ **Rust dependencies (audio, AI, UI)**
+- `package.json` - ✅ **npm workspaces + all scripts working**
 
 ---
 
-## Next Immediate Steps
+## 🚀 Project Status Summary
 
-The foundation is solid. To continue building:
+**OATMEAL IS FULLY FUNCTIONAL** - Complete meeting assistant with:
+- **Real-time transcription** using local Whisper AI
+- **Interactive AI summaries** with Llama 3 8B learning from user feedback  
+- **Automatic audio detection** (microphone vs system audio for headphones)
+- **macOS integration** with proper permissions and global shortcuts
+- **Modern UI** with dark mode, live audio visualization, and intuitive controls
 
-1. **Install Rust** (prerequisite for all audio work)
-2. **Implement audio capture** in `packages/audio-core` 
-3. **Wire up real audio pipeline** to replace UI stubs
-4. **Add Claude API integration** for actual summarization
-5. **Test end-to-end flow**
+**Ready for advanced features**: MEDDPICC extraction, CRM integrations, advanced coaching features.
 
-The project structure supports incremental development - each package can be implemented and tested independently.
+**Development Environment**: Fully set up and working - just run `npm run tauri:dev` to start!

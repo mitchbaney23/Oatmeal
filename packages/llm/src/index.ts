@@ -1,4 +1,5 @@
 export { SummaryPipeline, type PipelineResult, type PipelineMeta } from './chain';
+export { OllamaProvider, type SummaryVariant } from './providers/ollama';
 export { 
   meetingSummarySchema, 
   type MeetingSummary, 

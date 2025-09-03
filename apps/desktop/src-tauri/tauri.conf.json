@@ -18,21 +18,19 @@
       "active": true,
       "targets": "all",
       "identifier": "com.oatmeal.app",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png", 
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ]
+      "macOS": {
+        "entitlements": "entitlements.plist"
+      },
+      "icon": [],
+      "resources": [],
+      "externalBin": [],
+      "copyright": "",
+      "category": "Productivity",
+      "shortDescription": "AI-powered meeting assistant",
+      "longDescription": "Oatmeal transcribes your meetings and calls for note-taking and AI-powered summaries."
     },
     "security": {
       "csp": null
-    },
-    "systemTray": {
-      "iconPath": "icons/32x32.png",
-      "iconAsTemplate": true,
-      "menuOnLeftClick": false
     },
     "windows": [
       {
