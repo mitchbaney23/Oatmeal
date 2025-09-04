@@ -16,6 +16,7 @@ pub struct Settings {
     pub summary_engine: String, // 'ollama' | 'anthropic' | 'openai' | 'none'
     pub ollama_model: String,
     pub ollama_host: String,
+    pub force_microphone: bool,
 }
 
 impl Default for Settings {
@@ -31,6 +32,7 @@ impl Default for Settings {
             summary_engine: "ollama".to_string(),
             ollama_model: "llama3.1:8b-instruct-q4_K_M".to_string(),
             ollama_host: "http://127.0.0.1:11434".to_string(),
+            force_microphone: false,
         }
     }
 }
@@ -68,6 +70,7 @@ impl Database {
                 summary_engine TEXT DEFAULT 'ollama',
                 ollama_model TEXT DEFAULT 'llama3.1:8b-instruct-q4_K_M',
                 ollama_host TEXT DEFAULT 'http://127.0.0.1:11434',
+                force_microphone BOOLEAN DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -84,6 +87,9 @@ impl Database {
             .execute(&pool)
             .await;
         let _ = sqlx::query("ALTER TABLE settings ADD COLUMN ollama_host TEXT DEFAULT 'http://127.0.0.1:11434'")
+            .execute(&pool)
+            .await;
+        let _ = sqlx::query("ALTER TABLE settings ADD COLUMN force_microphone BOOLEAN DEFAULT 0")
             .execute(&pool)
             .await;
 
@@ -120,7 +126,7 @@ impl Database {
     }
 
     pub async fn get_settings(&self) -> Result<Settings, sqlx::Error> {
-        let row = sqlx::query("SELECT * FROM settings LIMIT 1")
+        let row = sqlx::query("SELECT * FROM settings ORDER BY updated_at DESC LIMIT 1")
             .fetch_optional(&self.pool)
             .await?;
 
@@ -136,6 +142,7 @@ impl Database {
                 summary_engine: row.try_get("summary_engine").unwrap_or("ollama".to_string()),
                 ollama_model: row.try_get("ollama_model").unwrap_or("llama3.1:8b-instruct-q4_K_M".to_string()),
                 ollama_host: row.try_get("ollama_host").unwrap_or("http://127.0.0.1:11434".to_string()),
+                force_microphone: row.try_get("force_microphone").unwrap_or(false),
             }),
             None => {
                 // Insert default settings
@@ -147,25 +154,82 @@ impl Database {
     }
 
     pub async fn update_settings(&self, settings: &Settings) -> Result<(), sqlx::Error> {
-        sqlx::query(r#"
-            INSERT OR REPLACE INTO settings (
-                id, enable_telemetry, retention_days, use_gpu, model, enable_hubspot, enable_gmail, chunk_seconds, summary_engine, ollama_model, ollama_host, updated_at
-            ) VALUES (
-                (SELECT id FROM settings LIMIT 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
-            )
-        "#)
-        .bind(&settings.enable_telemetry)
-        .bind(&settings.retention_days)
-        .bind(&settings.use_gpu)
-        .bind(&settings.model)
-        .bind(&settings.enable_hubspot)
-        .bind(&settings.enable_gmail)
-        .bind(&settings.chunk_seconds)
-        .bind(&settings.summary_engine)
-        .bind(&settings.ollama_model)
-        .bind(&settings.ollama_host)
-        .execute(&self.pool)
-        .await?;
+        // Ensure there is exactly one settings row. If none, insert; else update existing.
+        let existing_id: Option<String> = sqlx::query_scalar("SELECT id FROM settings ORDER BY updated_at DESC LIMIT 1")
+            .fetch_optional(&self.pool)
+            .await?;
+
+        if let Some(id) = existing_id {
+            sqlx::query(r#"
+                UPDATE settings SET
+                    enable_telemetry = ?,
+                    retention_days = ?,
+                    use_gpu = ?,
+                    model = ?,
+                    enable_hubspot = ?,
+                    enable_gmail = ?,
+                    chunk_seconds = ?,
+                    summary_engine = ?,
+                    ollama_model = ?,
+                    ollama_host = ?,
+                    force_microphone = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            "#)
+            .bind(&settings.enable_telemetry)
+            .bind(&settings.retention_days)
+            .bind(&settings.use_gpu)
+            .bind(&settings.model)
+            .bind(&settings.enable_hubspot)
+            .bind(&settings.enable_gmail)
+            .bind(&settings.chunk_seconds)
+            .bind(&settings.summary_engine)
+            .bind(&settings.ollama_model)
+            .bind(&settings.ollama_host)
+            .bind(&settings.force_microphone)
+            .bind(&id)
+            .execute(&self.pool)
+            .await?;
+        } else {
+            let id = uuid::Uuid::new_v4().to_string();
+            sqlx::query(r#"
+                INSERT INTO settings (
+                    id, enable_telemetry, retention_days, use_gpu, model, enable_hubspot, enable_gmail, chunk_seconds, summary_engine, ollama_model, ollama_host, force_microphone, created_at, updated_at
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+            "#)
+            .bind(&id)
+            .bind(&settings.enable_telemetry)
+            .bind(&settings.retention_days)
+            .bind(&settings.use_gpu)
+            .bind(&settings.model)
+            .bind(&settings.enable_hubspot)
+            .bind(&settings.enable_gmail)
+            .bind(&settings.chunk_seconds)
+            .bind(&settings.summary_engine)
+            .bind(&settings.ollama_model)
+            .bind(&settings.ollama_host)
+            .bind(&settings.force_microphone)
+            .execute(&self.pool)
+            .await?;
+            // Remove any legacy extra rows, keep only the one we just inserted
+            sqlx::query("DELETE FROM settings WHERE id <> ?")
+                .bind(&id)
+                .execute(&self.pool)
+                .await?;
+        }
+
+        // After update, ensure only one row remains (cleanup legacy duplicates)
+        let keep_id_opt: Option<String> = sqlx::query_scalar("SELECT id FROM settings ORDER BY updated_at DESC LIMIT 1")
+            .fetch_optional(&self.pool)
+            .await?;
+        if let Some(keep_id) = keep_id_opt {
+            sqlx::query("DELETE FROM settings WHERE id <> ?")
+                .bind(&keep_id)
+                .execute(&self.pool)
+                .await?;
+        }
 
         Ok(())
     }

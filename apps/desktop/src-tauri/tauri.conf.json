@@ -12,22 +12,29 @@
   },
   "tauri": {
     "allowlist": {
-      "all": true
+      "all": true,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "globalShortcut": {
+        "all": true
+      }
     },
     "bundle": {
       "active": true,
       "targets": "all",
       "identifier": "com.oatmeal.app",
-      "macOS": {
-        "entitlements": "entitlements.plist"
-      },
       "icon": [],
       "resources": [],
       "externalBin": [],
       "copyright": "",
       "category": "Productivity",
       "shortDescription": "AI-powered meeting assistant",
-      "longDescription": "Oatmeal transcribes your meetings and calls for note-taking and AI-powered summaries."
+      "longDescription": "Oatmeal transcribes your meetings and calls for note-taking and AI-powered summaries.",
+      "macOS": {
+        "entitlements": "entitlements.plist"
+      }
     },
     "security": {
       "csp": null

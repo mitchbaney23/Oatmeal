@@ -18,6 +18,7 @@ function App() {
   const { isRecording, setIsRecording, transcript, setTranscript, frameCount, resetAudio, startRecording, getRecordingDuration, levels } = useAudio();
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'undetermined' | 'unknown'>('unknown');
+  const [screenPerm, setScreenPerm] = useState<'granted' | 'denied' | 'unknown'>('unknown');
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
 
   // Enable dark mode by default
@@ -43,6 +44,14 @@ function App() {
         console.log('Initializing local Whisper transcriber...');
         await invoke('initialize_transcriber');
         console.log('Transcriber ready!');
+
+        // Check Screen Recording (system audio) permission on macOS
+        try {
+          const ok = await invoke<boolean>('check_screen_capture_permission');
+          setScreenPerm(ok ? 'granted' : 'denied');
+        } catch (e) {
+          setScreenPerm('unknown');
+        }
       } catch (error) {
         console.error('Failed to initialize app:', error);
       }
@@ -84,7 +93,7 @@ function App() {
       setAppState('processing');
       
       // Save the session to database
-      const duration = getRecordingDuration();
+      const duration = await getRecordingDuration();
       const title = `Recording ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
       
       if (transcript.trim()) {
@@ -217,6 +226,23 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+      {screenPerm !== 'granted' && (
+        <div className="w-full bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 border-b border-amber-200/60 dark:border-amber-800/50">
+          <div className="max-w-5xl mx-auto px-4 py-2 text-sm flex items-center justify-between gap-3">
+            <div>
+              <strong>Grant Screen Recording</strong> to capture system audio automatically.
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={async () => {
+                try { await invoke('open_screen_capture_settings'); } catch {}
+              }}>Open Settings</Button>
+              <Button size="sm" onClick={async () => {
+                try { const ok = await invoke<boolean>('check_screen_capture_permission'); setScreenPerm(ok ? 'granted' : 'denied'); } catch {}
+              }}>Check Again</Button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Oatmeal Header */}
       <header className="flex items-center justify-between p-6 border-b border-black/10 dark:border-white/10">
         <div className="flex items-center gap-3">

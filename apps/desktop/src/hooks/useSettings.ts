@@ -12,6 +12,7 @@ export interface Settings {
   summary_engine: 'ollama' | 'anthropic' | 'openai' | 'none';
   ollama_model: string;
   ollama_host: string;
+  force_microphone: boolean;
 }
 
 export function useSettings() {
@@ -32,13 +33,15 @@ export function useSettings() {
     }
   };
 
-  const saveSettings = async (newSettings: Settings) => {
+  const saveSettings = async (newSettings: Settings): Promise<Settings> => {
     try {
-      await invoke('update_settings', { settings: newSettings });
-      setSettings(newSettings);
+      const saved = await invoke<Settings>('update_settings', { settings: newSettings });
+      setSettings(saved);
       setError(null);
+      return saved;
     } catch (err) {
       setError(err as string);
+      throw err;
     }
   };
 

@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender, Receiver};
 use std::sync::Arc;
 use std::thread;
@@ -8,50 +8,18 @@ use crossbeam_channel as channel;
 use tauri::Manager;
 
 fn detect_headphones_or_external_audio(host: &cpal::Host) -> bool {
-  // Check the default output device to determine if headphones or external audio is connected
   if let Some(default_output) = host.default_output_device() {
     if let Ok(device_name) = default_output.name() {
       let name_lower = device_name.to_lowercase();
+      println!("Default output device: {}", device_name);
       
-      // Common indicators of headphones or external audio devices
-      let headphone_indicators = [
-        "headphone", "headset", "airpods", "bluetooth", "usb", "external",
-        "beats", "sony", "bose", "sennheiser", "audio-technica", "beyerdynamic"
-      ];
-      
-      for indicator in &headphone_indicators {
-        if name_lower.contains(indicator) {
-          return true;
-        }
-      }
-      
-      // Check if it's NOT the built-in speakers
-      if !name_lower.contains("built-in") && 
-         !name_lower.contains("internal") && 
-         !name_lower.contains("macbook") {
-        return true; // Likely external audio device
-      }
+      // Simple check - if not built-in speakers, assume headphones/external audio
+      return !name_lower.contains("built-in") && 
+             !name_lower.contains("internal") && 
+             !name_lower.contains("macbook");
     }
   }
-  
-  // Also check output devices list for connected external devices
-  if let Ok(devices) = host.output_devices() {
-    let mut external_device_count = 0;
-    for device in devices {
-      if let Ok(name) = device.name() {
-        let name_lower = name.to_lowercase();
-        if !name_lower.contains("built-in") && !name_lower.contains("internal") {
-          external_device_count += 1;
-        }
-      }
-    }
-    // If there are external devices available, assume they might be in use
-    if external_device_count > 0 {
-      return true;
-    }
-  }
-  
-  false // Default to built-in speakers/microphone setup
+  false
 }
 
 #[derive(Debug, Clone)]
@@ -61,7 +29,7 @@ pub enum AudioSource {
 }
 
 enum Command {
-  Start(tauri::AppHandle),
+  Start(tauri::AppHandle, bool /* force_microphone */),
   Stop,
 }
 
@@ -78,12 +46,15 @@ impl AudioRuntime {
 
     thread::spawn(move || {
       // State owned by the worker thread only
-      let mut stream: Option<cpal::Stream> = None;
+      enum ActiveStream { Single(cpal::Stream), Mixed(cpal::Stream, cpal::Stream) }
+      let mut stream: Option<ActiveStream> = None;
 
       // Inner function to start capture with given app handle
+      const ENABLE_MIXED_CAPTURE: bool = false; // Disabled for now - using SCKit + AirPods Pro separately
       let start_capture = |app_handle: tauri::AppHandle,
+                           force_microphone: bool,
                            is_capturing_flag: Arc<AtomicBool>,
-                           stream_slot: &mut Option<cpal::Stream>| {
+                           stream_slot: &mut Option<ActiveStream>| {
         if is_capturing_flag.load(Ordering::Relaxed) {
           return; // already capturing
         }
@@ -93,53 +64,107 @@ impl AudioRuntime {
         let host = cpal::default_host();
         
         // First, check if there are headphones or external audio devices connected
-        let should_use_system_audio = detect_headphones_or_external_audio(&host);
+        // Allow override via settings (force microphone)
+        // Discover devices - prioritize aggregate/system audio devices
+        let mic_device = host.default_input_device();
+        let mut loopback_device = None;
+        let mut airpods_mic_device = None;
         
-        let (device, actual_source) = if should_use_system_audio {
-          // Look for system audio loopback device
-          let mut loopback_device = None;
-          if let Ok(devices) = host.input_devices() {
-            for device in devices {
-              if let Ok(name) = device.name() {
-                // Look for common macOS loopback device names
-                if name.to_lowercase().contains("soundflower") || 
-                   name.to_lowercase().contains("loopback") ||
-                   name.to_lowercase().contains("blackhole") ||
-                   name.to_lowercase().contains("multi-output") {
+        if let Ok(devices) = host.input_devices() {
+          // Single pass through devices to find what we need
+          for device in devices {
+            if let Ok(name) = device.name() {
+              let nl = name.to_lowercase();
+              println!("Available input device: {}", name);
+              
+              // Check for AirPods Pro microphone
+              if nl.contains("airpods") && airpods_mic_device.is_none() {
+                println!("🎧 Found AirPods microphone: {}", name);
+                airpods_mic_device = Some(device.clone());
+              }
+              
+              // Look for system audio devices (prioritize aggregate, AVOID BlackHole)
+              if loopback_device.is_none() && !nl.contains("blackhole") {
+                if nl.contains("aggregate") {
+                  println!("Found aggregate device (preferred): {}", name);
                   loopback_device = Some(device);
-                  break;
+                } else if nl.contains("multi-output") || nl.contains("soundflower") || 
+                         nl.contains("loopback") || nl.contains("virtual") || nl.contains("system") {
+                  println!("Found system audio device: {}", name);
+                  loopback_device = Some(device);
                 }
+              }
+              
+              // Explicitly skip BlackHole devices
+              if nl.contains("blackhole") {
+                println!("❌ Skipping BlackHole device: {}", name);
               }
             }
           }
-          
+        }
+        
+        // Check if we should use system audio vs microphone
+        // For AirPods Pro: we want MIXED capture (both mic + system audio)
+        let headphones_detected = detect_headphones_or_external_audio(&host);
+        let mut should_use_system_audio = headphones_detected && !force_microphone;
+        
+        // For mixed capture: prioritize AirPods Pro mic + system audio via SCKit
+        println!("🎧 Audio setup: AirPods Pro detected={}, System audio device available={}", 
+                 airpods_mic_device.is_some(), loopback_device.is_some());
+        
+        // If no loopback device found but headphones are detected, provide helpful guidance
+        if should_use_system_audio && loopback_device.is_none() {
+          println!("🎧 Headphones detected. System audio capture will use ScreenCaptureKit when available.");
+          println!("If system capture is unavailable or denied, falling back to microphone.");
+        }
+
+        // Simple approach: Use AirPods Pro microphone when available
+        // SCKit will handle system audio separately, and UI will mix them
+        if airpods_mic_device.is_some() && should_use_system_audio {
+          println!("🎵 Using AirPods Pro microphone + ScreenCaptureKit system audio (mixed in UI)");
+          should_use_system_audio = false; // Use microphone for CPAL, system audio via SCKit
+        }
+
+        // Single-device selection fallback
+        let (device, _actual_source) = if should_use_system_audio {
           match loopback_device {
             Some(d) => {
-              println!("Detected headphones/external audio - using system audio capture");
+              if let Ok(name) = d.name() {
+                println!("✅ Using system audio device: {}", name);
+                if name.to_lowercase().contains("aggregate") {
+                  println!("🎯 Perfect! Aggregate device will capture system audio + mic together");
+                }
+              }
               (d, AudioSource::SystemAudio)
             }
             None => {
-              println!("Headphones detected but no loopback device found - falling back to microphone");
-              println!("For better experience with headphones, install: brew install --cask blackhole-16ch");
-              match host.default_input_device() {
+              println!("Headphones detected but no system audio capture available - using microphone only");
+              println!("To capture both your voice AND system audio (for calls/meetings):");
+              println!("1. Open Audio MIDI Setup (Spotlight -> 'Audio MIDI Setup')");
+              println!("2. Click '+' and create 'Multi-Output Device'");
+              println!("3. Check both 'BlackHole 16ch' and your headphones");
+              println!("4. Set this Multi-Output as your system output in System Preferences");
+              println!("5. In Oatmeal, BlackHole will capture system audio while your headphones play it");
+              match mic_device {
                 Some(d) => (d, AudioSource::Microphone),
-                None => {
-                  eprintln!("No input device available");
-                  is_capturing_flag.store(false, Ordering::Relaxed);
-                  return;
-                }
+                None => { eprintln!("No input device available"); is_capturing_flag.store(false, Ordering::Relaxed); return; }
               }
             }
           }
         } else {
-          // Use microphone when audio is going to speakers
-          println!("Audio going to speakers - using microphone");
-          match host.default_input_device() {
-            Some(d) => (d, AudioSource::Microphone),
-            None => {
-              eprintln!("No default input device available");
-              is_capturing_flag.store(false, Ordering::Relaxed);
-              return;
+          println!("Audio going to speakers or using AirPods Pro microphone");
+          // Prefer AirPods Pro microphone if available, otherwise default mic
+          match airpods_mic_device.or(mic_device) {
+            Some(d) => {
+              if let Ok(name) = d.name() {
+                println!("✅ Using microphone: {}", name);
+              }
+              (d, AudioSource::Microphone)
+            },
+            None => { 
+              eprintln!("No input device available"); 
+              is_capturing_flag.store(false, Ordering::Relaxed); 
+              return; 
             }
           }
         };
@@ -186,18 +211,36 @@ impl AudioRuntime {
         thread::spawn(move || {
           let frame_len = (sample_rate / 50).max(1);
           let mut buf: Vec<f32> = Vec::with_capacity(frame_len * 2);
+          let mut frames_emitted = 0u64;
+          let mut samples_received = 0u64;
+          
+          println!("📡 Aggregator started: frame_len={}, target_rate={}", frame_len, sample_rate);
 
           while is_capturing_emit.load(Ordering::Relaxed) {
             match rx_samp.recv() {
-              Ok(s) => buf.push(s),
+              Ok(s) => {
+                buf.push(s);
+                samples_received += 1;
+              },
               Err(_) => break,
             }
             while let Ok(s) = rx_samp.try_recv() {
               buf.push(s);
+              samples_received += 1;
               if buf.len() >= frame_len { break; }
             }
             while buf.len() >= frame_len {
               let frame: Vec<f32> = buf.drain(0..frame_len).collect();
+              
+              // Check if frame has any activity
+              let max_amplitude = frame.iter().map(|&s| s.abs()).fold(0.0f32, f32::max);
+              
+              frames_emitted += 1;
+              if frames_emitted % 50 == 0 {
+                println!("📡 Aggregator: {} frames emitted, {} samples received, last frame max amplitude: {:.4}", 
+                         frames_emitted, samples_received, max_amplitude);
+              }
+              
               let _ = app_handle_emit.emit_all(
                 "audio:frame",
                 serde_json::json!({
@@ -227,24 +270,47 @@ impl AudioRuntime {
           }
         });
 
-        // Build CPAL stream
+        // Build CPAL stream with debug logging
         let build_stream = |sample_format: cpal::SampleFormat| -> Result<cpal::Stream, String> {
           match sample_format {
             cpal::SampleFormat::F32 => {
               let is_capturing_cb = is_capturing_flag.clone();
+              let sample_count = Arc::new(AtomicU64::new(0));
+              let non_zero_samples = Arc::new(AtomicU64::new(0));
+              let sample_count_cb = sample_count.clone();
+              let non_zero_samples_cb = non_zero_samples.clone();
               device
               .build_input_stream(
                 &config,
                 move |data: &[f32], _| {
                   if !is_capturing_cb.load(Ordering::Relaxed) { return; }
+                  let prev_count = sample_count_cb.fetch_add(data.len() as u64, Ordering::Relaxed);
+                  let new_count = prev_count + data.len() as u64;
+                  
                   if channels == 1 {
-                    for &s in data { let _ = tx_samp.try_send(s); }
+                    for &s in data { 
+                      if s.abs() > 0.001 { 
+                        non_zero_samples_cb.fetch_add(1, Ordering::Relaxed);
+                      }
+                      let _ = tx_samp.try_send(s); 
+                    }
                   } else {
                     for frame in data.chunks_exact(channels) {
                       let sum: f32 = frame.iter().copied().sum();
                       let avg = sum / channels as f32;
+                      if avg.abs() > 0.001 { 
+                        non_zero_samples_cb.fetch_add(1, Ordering::Relaxed);
+                      }
                       let _ = tx_samp.try_send(avg);
                     }
+                  }
+                  
+                  // Log every 16000 samples (1 second at 16kHz)
+                  if new_count / 16000 > prev_count / 16000 {
+                    let nz = non_zero_samples_cb.load(Ordering::Relaxed);
+                    println!("🎤 Audio samples: {} total, {} non-zero (activity: {:.1}%)", 
+                             new_count, nz, 
+                             (nz as f32 / new_count as f32) * 100.0);
                   }
                 },
                 move |err| { eprintln!("Audio input stream error: {}", err); },
@@ -310,7 +376,7 @@ impl AudioRuntime {
               is_capturing_flag.store(false, Ordering::Relaxed);
               return;
             }
-            *stream_slot = Some(s);
+            *stream_slot = Some(ActiveStream::Single(s));
             println!("Started real audio capture ({} Hz, {} ch)", sample_rate, channels);
           }
           Err(e) => {
@@ -321,7 +387,7 @@ impl AudioRuntime {
         }
       };
 
-      let stop_capture = |is_capturing_flag: Arc<AtomicBool>, stream_slot: &mut Option<cpal::Stream>| {
+      let stop_capture = |is_capturing_flag: Arc<AtomicBool>, stream_slot: &mut Option<ActiveStream>| {
         is_capturing_flag.store(false, Ordering::Relaxed);
         *stream_slot = None; // drop stream; aggregator will also stop
         println!("Stopped real audio capture");
@@ -330,7 +396,7 @@ impl AudioRuntime {
       // Command loop
       while let Ok(cmd) = rx.recv() {
         match cmd {
-          Command::Start(app_handle) => start_capture(app_handle, is_capturing_worker.clone(), &mut stream),
+          Command::Start(app_handle, force_mic) => start_capture(app_handle, force_mic, is_capturing_worker.clone(), &mut stream),
           Command::Stop => stop_capture(is_capturing_worker.clone(), &mut stream),
         }
       }
@@ -339,8 +405,8 @@ impl AudioRuntime {
     Self { tx, is_capturing }
   }
 
-  pub fn start(&self, app_handle: tauri::AppHandle) -> Result<(), String> {
-    let _ = self.tx.send(Command::Start(app_handle)).map_err(|e| e.to_string())?;
+  pub fn start(&self, app_handle: tauri::AppHandle, force_microphone: bool) -> Result<(), String> {
+    let _ = self.tx.send(Command::Start(app_handle, force_microphone)).map_err(|e| e.to_string())?;
     Ok(())
   }
 

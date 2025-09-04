@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@oatmeal/ui';
 import { Square, Bookmark } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/tauri';
 import Waveform from './Waveform';
 
 interface RecorderPanelProps {
@@ -16,9 +17,18 @@ export default function RecorderPanel({ isRecording, onStop, levels = [] }: Reco
     let interval: ReturnType<typeof setInterval>;
     
     if (isRecording) {
-      interval = setInterval(() => {
-        setDuration(prev => prev + 1);
-      }, 1000);
+      // Get initial duration when starting
+      const updateDuration = async () => {
+        try {
+          const backendDuration = await invoke<number>('get_recording_duration');
+          setDuration(backendDuration);
+        } catch (error) {
+          console.warn('Could not get recording duration:', error);
+        }
+      };
+      
+      updateDuration(); // Get initial duration
+      interval = setInterval(updateDuration, 1000); // Update every second
     } else {
       setDuration(0);
     }

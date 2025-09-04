@@ -11,6 +11,7 @@ export interface AudioFrame {
 
 export function useAudio() {
   const { settings } = useSettings();
+  const [chunkSeconds, setChunkSeconds] = useState<number>(2.5);
   const [isRecording, setIsRecording] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
   const [transcript, setTranscript] = useState('');
@@ -23,6 +24,20 @@ export function useAudio() {
   const lastVoiceMsRef = useRef<number | null>(null);
   const sampleRateRef = useRef<number | null>(null);
   const transcribingRef = useRef<boolean>(false);
+
+  // Check recording status from backend on mount to restore state
+  useEffect(() => {
+    const checkRecordingStatus = async () => {
+      try {
+        const isActive = await invoke<boolean>('is_recording');
+        setIsRecording(isActive);
+      } catch (error) {
+        console.warn('Could not check recording status:', error);
+      }
+    };
+    
+    checkRecordingStatus();
+  }, []);
 
   const resetHotRefs = () => {
     audioBufferRef.current = [];
@@ -98,18 +113,18 @@ export function useAudio() {
     }
 
     // Transcribe when either: chunk length reached OR we detect a pause after speech
-    const chunkSeconds = Math.max(1, Math.min(6, Number(settings?.chunk_seconds ?? 2.5)));
+    const cs = Math.max(1, Math.min(6, Number(chunkSeconds ?? 2.5)));
     const sr = sampleRateRef.current;
-    const neededSamples = sr ? Math.floor(sr * chunkSeconds) : 0;
+    const neededSamples = sr ? Math.floor(sr * cs) : 0;
     const enoughForChunk = sr ? audioBufferRef.current.length >= neededSamples : false;
     const silenceGapMs = lastVoiceMsRef.current ? (nowMs - lastVoiceMsRef.current) : Infinity;
-    const minUtteranceSamples = sr ? Math.floor(sr * Math.min(1.0, chunkSeconds)) : 0; // at least ~1s
+    const minUtteranceSamples = sr ? Math.floor(sr * Math.min(1.0, cs)) : 0; // at least ~1s
     const pauseDetected = speakingRef.current && silenceGapMs >= 450 && audioBufferRef.current.length >= minUtteranceSamples;
 
     if ((enoughForChunk || pauseDetected) && !transcribingRef.current) {
       flushTranscription();
     }
-  }, [frameCount, settings?.chunk_seconds, flushTranscription]);
+  }, [frameCount, chunkSeconds, flushTranscription]);
 
   // Stable event subscription to avoid resubscribe storms
   const handlerRef = useRef<(f: AudioFrame) => void>();
@@ -123,14 +138,31 @@ export function useAudio() {
     return () => { active = false; if (unlistenFn) unlistenFn(); };
   }, []);
 
+  // hydrate chunkSeconds and listen for runtime updates from Settings
+  useEffect(() => {
+    invoke<any>('get_settings').then(s => {
+      if (s && typeof s.chunk_seconds === 'number') setChunkSeconds(s.chunk_seconds);
+    }).catch(() => {});
+    let unlisten: (() => void) | null = null;
+    listen<any>('settings:updated', (e) => {
+      const s = e.payload as any;
+      if (s && typeof s.chunk_seconds === 'number') setChunkSeconds(s.chunk_seconds);
+    }).then(fn => { unlisten = fn; });
+    return () => { if (unlisten) unlisten(); };
+  }, []);
+
   const startRecording = async () => {
     await invoke('start_recording');
-    setRecordingStartTime(Date.now());
+    // Start time is now managed by the backend
   };
 
-  const getRecordingDuration = () => {
-    if (!recordingStartTime) return 0;
-    return Math.floor((Date.now() - recordingStartTime) / 1000);
+  const getRecordingDuration = async () => {
+    try {
+      return await invoke<number>('get_recording_duration');
+    } catch (error) {
+      console.warn('Could not get recording duration:', error);
+      return 0;
+    }
   };
 
   const resetAudio = () => {

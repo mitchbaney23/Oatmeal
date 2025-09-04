@@ -13,6 +13,8 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "tauri:dev": "npm run tauri:dev -w apps/desktop",
+    "tauri:build": "npm run tauri:build -w apps/desktop",
     "clean": "turbo run clean",
     "dl:models": "node scripts/download-models.js",
     "sample:record": "node scripts/record-sample.js"

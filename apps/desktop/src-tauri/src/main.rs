@@ -9,6 +9,7 @@ use tauri::{GlobalShortcutManager, State};
 mod audio;
 mod database;
 mod transcribe;
+mod sckit;
 
 use audio::{AudioRuntime, AudioSource};
 use database::{Database, Settings, SessionRecord};
@@ -23,6 +24,7 @@ struct AppState {
     audio_capture: AudioRuntime,
     database: Arc<Mutex<Option<Database>>>,
     transcriber: Arc<Mutex<Transcriber>>,
+    recording_start_time: Arc<Mutex<Option<u64>>>, // Unix timestamp in milliseconds
 }
 
 #[tauri::command]
@@ -85,11 +87,49 @@ async fn start_recording(app_handle: tauri::AppHandle, state: State<'_, AppState
         }
     }
     
-    state.audio_capture.start(app_handle)
+    // Store start time when recording begins
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    *state.recording_start_time.lock().await = Some(now);
+
+    // Attempt to start macOS ScreenCaptureKit system-audio capture automatically.
+    // If SCKit isn't available or not yet linked, fall back to our runtime mic capture.
+    let mut force_microphone = false;
+    {
+        // Ensure DB and read settings
+        ensure_database(&app_handle, &state).await?;
+        let db_guard = state.database.lock().await;
+        if let Some(database) = db_guard.as_ref() {
+            if let Ok(s) = database.get_settings().await {
+                force_microphone = s.force_microphone;
+            }
+        }
+    }
+
+    // Try SCKit for system audio capture; if it starts, do not start mic (avoid duplicate frames)
+    #[cfg(target_os = "macos")]
+    {
+        match sckit::macos::start_system_audio_capture(app_handle.clone()).await {
+            Ok(()) => {
+                println!("✅ ScreenCaptureKit system audio capture started");
+                return Ok(());
+            }
+            Err(e) => {
+                println!("⚠️ ScreenCaptureKit not available: {}. Using CPAL runtime capture only.", e);
+            }
+        }
+    }
+
+    // Fallback mic/system runtime capture
+    state.audio_capture.start(app_handle, force_microphone)
 }
 
 #[tauri::command]
 async fn stop_recording(state: State<'_, AppState>) -> Result<(), String> {
+    // Clear recording start time when stopping
+    *state.recording_start_time.lock().await = None;
     state.audio_capture.stop()
 }
 
@@ -97,6 +137,21 @@ async fn stop_recording(state: State<'_, AppState>) -> Result<(), String> {
 #[tauri::command]
 async fn is_recording(state: State<'_, AppState>) -> Result<bool, String> {
     Ok(state.audio_capture.is_capturing())
+}
+
+#[tauri::command]
+async fn get_recording_duration(state: State<'_, AppState>) -> Result<u32, String> {
+    let start_time_guard = state.recording_start_time.lock().await;
+    if let Some(start_time) = *start_time_guard {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let duration_ms = now - start_time;
+        Ok((duration_ms / 1000) as u32) // Return duration in seconds
+    } else {
+        Ok(0)
+    }
 }
 
 #[tauri::command]
@@ -136,16 +191,25 @@ async fn get_settings(app_handle: tauri::AppHandle, state: State<'_, AppState>) 
 }
 
 #[tauri::command]
-async fn update_settings(settings: Settings, app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+async fn update_settings(settings: Settings, app_handle: tauri::AppHandle, state: State<'_, AppState>) -> Result<Settings, String> {
     ensure_database(&app_handle, &state).await?;
 
     let db_guard = state.database.lock().await;
     let database = db_guard.as_ref().ok_or("Database not initialized")?;
+    println!("Saving settings: chunk_seconds={}, engine={}, model={}, host={}", settings.chunk_seconds, settings.summary_engine, settings.ollama_model, settings.ollama_host);
 
     database
         .update_settings(&settings)
         .await
-        .map_err(|e| format!("Failed to update settings: {}", e))
+        .map_err(|e| format!("Failed to update settings: {}", e))?;
+
+    // Return the persisted settings
+    let reloaded = database
+        .get_settings()
+        .await
+        .map_err(|e| format!("Failed to reload settings: {}", e))?;
+    println!("Reloaded settings: chunk_seconds={}, engine={}, model={}, host={}", reloaded.chunk_seconds, reloaded.summary_engine, reloaded.ollama_model, reloaded.ollama_host);
+    Ok(reloaded)
 }
 
 #[tauri::command]
@@ -319,13 +383,17 @@ fn main() {
             audio_capture: AudioRuntime::new(),
             database: Arc::new(Mutex::new(None)),
             transcriber: Arc::new(Mutex::new(Transcriber::new())),
+            recording_start_time: Arc::new(Mutex::new(None)),
         })
         .invoke_handler(tauri::generate_handler![
             initialize_app,
             start_recording,
             stop_recording,
             is_recording,
+            get_recording_duration,
             create_quick_note,
+            check_screen_capture_permission,
+            open_screen_capture_settings,
             get_settings,
             update_settings,
             update_session_summary,
@@ -345,4 +413,32 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+async fn check_screen_capture_permission() -> Result<bool, String> {
+    #[cfg(target_os = "macos")]
+    {
+        return sckit::macos::check_permission();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
+async fn open_screen_capture_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+            .status()
+            .map_err(|e| format!("Failed to open settings: {}", e))?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Not supported on this OS".to_string())
+    }
 }
