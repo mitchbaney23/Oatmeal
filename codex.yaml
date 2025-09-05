@@ -1,0 +1,39 @@
+version: 1
+project:
+  name: Oatmeal
+  description: Menubar meeting assistant (Tauri + React + TS monorepo)
+guidance:
+  instructions_file: CODEX.md
+defaults:
+  plan: true
+  shell:
+    allowed: true
+files:
+  include:
+    - apps/**
+    - packages/**
+    - scripts/**
+    - "*.json"
+    - "*.js"
+    - "*.ts"
+    - "*.tsx"
+    - "*.md"
+    - .env.example
+    - pnpm-workspace.yaml
+  exclude:
+    - node_modules/**
+    - .git/**
+    - .turbo/**
+    - dist/**
+    - build/**
+
+mcpServers:
+  playwright:
+    command: npx
+    args:
+      - -y
+      - @modelcontextprotocol/server-playwright
+    env:
+      HEADLESS: "1"
+      # Optionally pin browser: CHROMIUM, FIREFOX, WEBKIT
+      # BROWSER: CHROMIUM
